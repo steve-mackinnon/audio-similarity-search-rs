@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 use directories::ProjectDirs;
 
 pub fn data_directory() -> Result<PathBuf, String> {
-    let project_dirs = ProjectDirs::from("com", "steve", "sampleorganizer");
+    let project_dirs = ProjectDirs::from("com", "steve-mackinnon", "audio-similarity-search");
     if project_dirs.is_none() {
         return Err("Failed to create directory for vector database".to_string());
     }
