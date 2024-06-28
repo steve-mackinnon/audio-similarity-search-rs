@@ -1,14 +1,7 @@
-#![feature(iter_array_chunks)]
-#![feature(fs_try_exists)]
-
+use audio_similarity_search::feature_extractor;
+use audio_similarity_search::vector_db::VectorDatabase;
 use core::panic;
-use feature_extractor::{RunMode, NUM_DIMENSIONS};
 use std::{env, time::Instant};
-use vector_db::VectorDatabase;
-
-mod feature_extractor;
-mod file_utils;
-mod vector_db;
 
 enum Mode {
     Build,
@@ -54,13 +47,15 @@ fn main() {
 
 fn build_database(asset_dir: &str) {
     let start_time = Instant::now();
-    let features = feature_extractor::extract_features(RunMode::Parallel, asset_dir).unwrap();
+    let features =
+        feature_extractor::extract_features(feature_extractor::RunMode::Parallel, asset_dir)
+            .unwrap();
     feature_extractor::save_to_file(&features).unwrap();
     let elapsed = start_time.elapsed();
     println!("Took {:.1?} to extract features", elapsed);
 
     let start_time = Instant::now();
-    let db = VectorDatabase::from_features(&features, NUM_DIMENSIONS).unwrap();
+    let db = VectorDatabase::from_features(&features, feature_extractor::NUM_DIMENSIONS).unwrap();
     if let Ok(results) = db.find_similar(0, 10) {
         for result in results {
             println!("{result}");
