@@ -1,7 +1,9 @@
 [package]
 name = "audio-similarity-search"
+description = "Performs similarity search for audio files on a local machine."
 version = "0.1.0"
 edition = "2021"
+license = "GPL-3.0"
 
 [dependencies]
 walkdir = "2"
