@@ -1,7 +1,7 @@
-use audio_similarity_search::feature_extractor;
 use audio_similarity_search::vector_db::VectorDatabase;
+use audio_similarity_search::{build_db, feature_extractor};
 use core::panic;
-use std::{env, time::Instant};
+use std::env;
 
 enum Mode {
     Build,
@@ -29,7 +29,7 @@ fn main() {
                 panic!("Invalid args provided for build mode");
             }
             let audio_asset_dir = &args[2];
-            build_database(audio_asset_dir);
+            let _ = build_db(audio_asset_dir);
         }
         Mode::ListSamples => {
             list_samples();
@@ -43,26 +43,6 @@ fn main() {
             find_similar(source_id, num_results);
         }
     };
-}
-
-fn build_database(asset_dir: &str) {
-    let start_time = Instant::now();
-    let features =
-        feature_extractor::extract_features(feature_extractor::RunMode::Parallel, asset_dir)
-            .unwrap();
-    feature_extractor::save_to_file(&features).unwrap();
-    let elapsed = start_time.elapsed();
-    println!("Took {:.1?} to extract features", elapsed);
-
-    let start_time = Instant::now();
-    let db = VectorDatabase::from_features(&features, feature_extractor::NUM_DIMENSIONS).unwrap();
-    if let Ok(results) = db.find_similar(0, 10) {
-        for result in results {
-            println!("{result}");
-        }
-    }
-    let elapsed = start_time.elapsed();
-    println!("Took {:.1?} to build database", elapsed);
 }
 
 fn find_similar(source_id: u32, num_results: usize) {
