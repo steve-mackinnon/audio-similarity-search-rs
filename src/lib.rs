@@ -29,3 +29,14 @@ pub fn build_db(asset_dir: &str) -> Result<VectorDatabase, String> {
 pub fn load_db_from_disk() -> Result<VectorDatabase, String> {
     VectorDatabase::load_from_disk()
 }
+
+pub fn list_audio_files() -> Result<Vec<String>, String> {
+    // TODO: right now this lists 100 arbitrary files. Ideally the files
+    // would be returned in order, and the client could request an arbitrary
+    // subset of files.
+    Ok(feature_extractor::from_file()?
+        .values()
+        .take(100)
+        .map(|v| v.to_string())
+        .collect())
+}
