@@ -40,3 +40,9 @@ pub fn list_audio_files() -> Result<Vec<String>, String> {
         .map(|v| v.to_string())
         .collect())
 }
+
+pub fn find_similar(source_id: u32, num_results: usize) -> Result<Vec<String>, String> {
+    // Otherwise, load the existing db from disk and query it
+    let db = VectorDatabase::load_from_disk()?;
+    db.find_similar(source_id, num_results)
+}

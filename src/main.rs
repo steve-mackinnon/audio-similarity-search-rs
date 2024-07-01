@@ -1,5 +1,4 @@
-use audio_similarity_search::vector_db::VectorDatabase;
-use audio_similarity_search::{build_db, feature_extractor};
+use audio_similarity_search::{build_db, feature_extractor, find_similar};
 use core::panic;
 use std::env;
 
@@ -40,19 +39,13 @@ fn main() {
             }
             let source_id = args[2].parse::<u32>().unwrap();
             let num_results = args[3].parse::<usize>().unwrap();
-            find_similar(source_id, num_results);
+            if let Ok(results) = find_similar(source_id, num_results) {
+                for result in results.iter() {
+                    println!("{result}");
+                }
+            }
         }
     };
-}
-
-fn find_similar(source_id: u32, num_results: usize) {
-    // Otherwise, load the existing db from disk and query it
-    let db = VectorDatabase::load_from_disk().unwrap();
-    if let Ok(results) = db.find_similar(source_id, num_results) {
-        for result in results {
-            println!("{result}");
-        }
-    }
 }
 
 fn list_samples() {
