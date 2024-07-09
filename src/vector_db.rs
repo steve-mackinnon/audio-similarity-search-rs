@@ -19,7 +19,7 @@ pub struct VectorDatabase {
 }
 
 impl VectorDatabase {
-    pub fn load_from_disk() -> Result<VectorDatabase, String> {
+    pub fn load_from_disk(asset_dir: Option<&str>) -> Result<VectorDatabase, String> {
         let dir = file_utils::data_directory()?;
         let env = unsafe {
             heed::EnvOpenOptions::new()
@@ -32,7 +32,7 @@ impl VectorDatabase {
         let db: ArroyDatabase<Angular> = env
             .create_database(&mut write_txn, None)
             .map_err(|e| e.to_string())?;
-        let feature_map = feature_extractor::from_file()?;
+        let feature_map = feature_extractor::from_file(asset_dir)?;
 
         Ok(VectorDatabase { db, feature_map })
     }

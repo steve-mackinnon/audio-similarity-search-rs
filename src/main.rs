@@ -25,12 +25,15 @@ fn main() {
     match run_mode {
         Mode::Build => {
             if args.len() != 3 {
-                panic!("Invalid args provided for build mode");
+                panic!("Invalid args");
             }
             let audio_asset_dir = &args[2];
             let _ = build_db(audio_asset_dir);
         }
         Mode::ListSamples => {
+            if args.len() != 2 {
+                panic!("Invalid args");
+            }
             list_samples();
         }
         Mode::Search => {
@@ -39,7 +42,7 @@ fn main() {
             }
             let source_id = args[2].parse::<u32>().unwrap();
             let num_results = args[3].parse::<usize>().unwrap();
-            if let Ok(results) = find_similar(source_id, num_results) {
+            if let Ok(results) = find_similar(source_id, num_results, None) {
                 for result in results.iter() {
                     println!("{result}");
                 }
@@ -49,7 +52,7 @@ fn main() {
 }
 
 fn list_samples() {
-    let features = feature_extractor::from_file().unwrap();
+    let features = feature_extractor::from_file(None).unwrap();
     for (id, path) in features.iter() {
         println!("{}: {}", id, path);
     }
