@@ -53,7 +53,7 @@ fn main() {
 
 fn list_samples() {
     let features = feature_extractor::from_file(None).unwrap();
-    for (id, path) in features.iter() {
+    for (id, path) in features.feature_map().iter() {
         println!("{}: {}", id, path);
     }
 }

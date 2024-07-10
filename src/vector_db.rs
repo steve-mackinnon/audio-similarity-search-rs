@@ -5,7 +5,7 @@ use rand::SeedableRng;
 use std::collections::HashMap;
 use std::fs;
 
-use crate::feature_extractor::{self, Feature};
+use crate::feature_extractor::{self, Feature, FeatureMetadata};
 use crate::file_utils;
 use arroy::distances::Angular;
 use arroy::{Database as ArroyDatabase, Reader, Writer};
@@ -15,10 +15,14 @@ const TWENTY_HUNDRED_MIB: usize = 2 * 1024 * 1024 * 1024;
 
 pub struct VectorDatabase {
     db: ArroyDatabase<Angular>,
-    feature_map: HashMap<u32, String>,
+    feature_metadata: FeatureMetadata,
 }
 
 impl VectorDatabase {
+    pub fn feature_metadata(&self) -> &FeatureMetadata {
+        &self.feature_metadata
+    }
+
     pub fn load_from_disk(asset_dir: Option<&str>) -> Result<VectorDatabase, String> {
         let dir = file_utils::data_directory()?;
         let env = unsafe {
@@ -32,14 +36,18 @@ impl VectorDatabase {
         let db: ArroyDatabase<Angular> = env
             .create_database(&mut write_txn, None)
             .map_err(|e| e.to_string())?;
-        let feature_map = feature_extractor::from_file(asset_dir)?;
+        let feature_metadata = feature_extractor::from_file(asset_dir)?;
 
-        Ok(VectorDatabase { db, feature_map })
+        Ok(VectorDatabase {
+            db,
+            feature_metadata,
+        })
     }
 
     pub fn from_features(
         features: &[Feature],
         dimensions: usize,
+        source_dir: &str,
     ) -> Result<VectorDatabase, String> {
         // TODO: right now we remove an existing db if we find one. Can we append to an existing db
         // if we aren't fully rebuilding the index? If so, we should split this out into a separate
@@ -95,7 +103,10 @@ impl VectorDatabase {
             feature_map.insert(feature.id(), feature.source_file().to_string());
         }
 
-        Ok(VectorDatabase { db, feature_map })
+        Ok(VectorDatabase {
+            db,
+            feature_metadata: FeatureMetadata::new(source_dir.to_string(), feature_map),
+        })
     }
 
     /// Returns a vector of file paths to the top k similar results
@@ -122,7 +133,7 @@ impl VectorDatabase {
             .map_err(|e| e.to_string())?
             .unwrap()
             .iter()
-            .filter_map(|result| self.feature_map.get(&result.0))
+            .filter_map(|result| self.feature_metadata.feature_map().get(&result.0))
             .map(|result| result.to_string())
             .collect();
         Ok(search_results)

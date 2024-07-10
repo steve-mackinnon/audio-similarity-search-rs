@@ -3,6 +3,7 @@
 
 use std::time::Instant;
 
+pub use feature_extractor::FeatureMetadata;
 use vector_db::VectorDatabase;
 
 pub mod feature_extractor;
@@ -19,7 +20,8 @@ pub fn build_db(asset_dir: &str) -> Result<VectorDatabase, String> {
     println!("Took {:.1?} to extract features", elapsed);
 
     let start_time = Instant::now();
-    let db = VectorDatabase::from_features(&features, feature_extractor::NUM_DIMENSIONS)?;
+    let db =
+        VectorDatabase::from_features(&features, feature_extractor::NUM_DIMENSIONS, asset_dir)?;
     let elapsed = start_time.elapsed();
     println!("Took {:.1?} to build database", elapsed);
 
@@ -32,6 +34,10 @@ pub fn load_db_from_disk(asset_dir: Option<&str>) -> Result<VectorDatabase, Stri
     VectorDatabase::load_from_disk(asset_dir)
 }
 
+pub fn load_feature_metadata_from_disk() -> Result<FeatureMetadata, String> {
+    feature_extractor::from_file(None)
+}
+
 /// A valid asset_dir can be provided to verify that audio files for the requested
 /// asset directory were found. If not, an error will be returned.
 pub fn list_audio_files(asset_dir: Option<&str>) -> Result<Vec<String>, String> {
@@ -39,6 +45,7 @@ pub fn list_audio_files(asset_dir: Option<&str>) -> Result<Vec<String>, String> 
     // would be returned in order, and the client could request an arbitrary
     // subset of files.
     Ok(feature_extractor::from_file(asset_dir)?
+        .feature_map()
         .values()
         .take(100)
         .map(|v| v.to_string())

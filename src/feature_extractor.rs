@@ -63,8 +63,8 @@ impl Feature {
     }
 }
 
-#[derive(Deserialize, Serialize)]
-struct FeatureMetadata {
+#[derive(Clone, Deserialize, Serialize)]
+pub struct FeatureMetadata {
     source_dir: String,
     feature_map: HashMap<u32, String>,
 }
@@ -75,6 +75,10 @@ impl FeatureMetadata {
             source_dir,
             feature_map,
         }
+    }
+
+    pub fn feature_map(&self) -> &HashMap<u32, String> {
+        &self.feature_map
     }
 }
 
@@ -151,7 +155,7 @@ pub fn save_to_file(features: &[Feature], source_dir: String) -> Result<(), Stri
     Ok(())
 }
 
-pub fn from_file(asset_dir: Option<&str>) -> Result<HashMap<u32, String>, String> {
+pub fn from_file(asset_dir: Option<&str>) -> Result<FeatureMetadata, String> {
     let file_path = file_utils::data_directory()?.join("features");
 
     let mut file = File::open(file_path).map_err(|e| format!("Failed to open file {}", e))?;
@@ -171,7 +175,7 @@ pub fn from_file(asset_dir: Option<&str>) -> Result<HashMap<u32, String>, String
         _ => {}
     }
 
-    Ok(features.feature_map)
+    Ok(features)
 }
 
 fn decode_and_calculate_mfcc(path: &str, output_sample_rate: u32) -> Result<Vec<f32>, String> {
