@@ -1,5 +1,6 @@
-use audio_similarity_search::{build_db, feature_extractor, find_similar};
+use audio_similarity_search::{build_db, metadata_db, vector_db::VectorDatabase};
 use core::panic;
+use metadata_db::MetadataDatabase;
 use std::env;
 
 enum Mode {
@@ -28,7 +29,7 @@ fn main() {
                 panic!("Invalid args");
             }
             let audio_asset_dir = &args[2];
-            let _ = build_db(audio_asset_dir);
+            let _ = build_db(audio_asset_dir).unwrap();
         }
         Mode::ListSamples => {
             if args.len() != 2 {
@@ -42,7 +43,8 @@ fn main() {
             }
             let source_id = args[2].parse::<u32>().unwrap();
             let num_results = args[3].parse::<usize>().unwrap();
-            if let Ok(results) = find_similar(source_id, num_results, None) {
+            let db = VectorDatabase::load_from_disk().unwrap();
+            if let Ok(results) = db.find_similar(source_id, num_results) {
                 for result in results.iter() {
                     println!("{result}");
                 }
@@ -52,8 +54,9 @@ fn main() {
 }
 
 fn list_samples() {
-    let features = feature_extractor::from_file(None).unwrap();
-    for (id, path) in features.feature_map().iter() {
-        println!("{}: {}", id, path);
+    let db = MetadataDatabase::load_from_disk().unwrap();
+    let paths = db.list_file_paths().unwrap();
+    for path in paths.iter() {
+        println!("{}", path);
     }
 }
