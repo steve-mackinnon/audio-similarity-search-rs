@@ -121,6 +121,7 @@ dependencies = [
  "rodio",
  "rubato",
  "rusqlite",
+ "serde",
  "threadpool",
  "walkdir",
 ]

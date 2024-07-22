@@ -1,11 +1,12 @@
-use rusqlite::{Connection, Result};
-
 use crate::file_utils;
+use rusqlite::{Connection, Result};
+use serde::{Deserialize, Serialize};
 
 pub struct MetadataDatabase {
     connection: Connection,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct AudioFile {
     id: i64,
     path: String,
