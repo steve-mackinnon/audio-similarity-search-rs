@@ -6,6 +6,20 @@ pub struct MetadataDatabase {
     connection: Connection,
 }
 
+pub struct AudioFile {
+    id: i64,
+    path: String,
+}
+
+impl AudioFile {
+    pub fn id(&self) -> i64 {
+        self.id
+    }
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+}
+
 impl MetadataDatabase {
     pub fn load_from_disk() -> Result<MetadataDatabase, String> {
         let file_path = file_utils::metadata_db_path()?;
@@ -94,18 +108,28 @@ impl MetadataDatabase {
         Ok(self.connection.last_insert_rowid())
     }
 
-    pub fn list_file_paths(&self) -> Result<Vec<String>, String> {
+    pub fn list_audio_files(
+        &self,
+        start_offset: u32,
+        limit: u32,
+    ) -> Result<Vec<AudioFile>, String> {
         let mut query = self
             .connection
-            .prepare("SELECT id, file_path FROM samples LIMIT 500")
+            .prepare(
+                format!(
+                    "SELECT id, file_path FROM samples WHERE id > {} ORDER BY id LIMIT {}",
+                    start_offset, limit
+                )
+                .as_str(),
+            )
             .map_err(|e| format!("Failed to prepare sqlite query: {}", e))?;
         let mut rows = query.query([]).map_err(|e| e.to_string())?;
-        let mut paths = Vec::new();
+        let mut files: Vec<AudioFile> = Vec::new();
         while let Some(row) = rows.next().map_err(|e| e.to_string())? {
             let id: i64 = row.get(0).unwrap();
             let path: String = row.get(1).unwrap();
-            paths.push(format!("{}: {}", id, path));
+            files.push(AudioFile { id, path });
         }
-        Ok(paths)
+        Ok(files)
     }
 }

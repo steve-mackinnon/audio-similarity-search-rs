@@ -55,8 +55,8 @@ fn main() {
 
 fn list_samples() {
     let db = MetadataDatabase::load_from_disk().unwrap();
-    let paths = db.list_file_paths().unwrap();
-    for path in paths.iter() {
-        println!("{}", path);
+    let files = db.list_audio_files(0, 1000).unwrap();
+    for file in files.iter() {
+        println!("{}", file.path());
     }
 }
