@@ -26,8 +26,8 @@ pub fn build_db(asset_dir: &str) -> Result<VectorDatabase, String> {
     Ok(db)
 }
 
-// pub fn find_similar(source_id: u32, num_results: usize) -> Result<Vec<u32>, String> {
-//     // Otherwise, load the existing db from disk and query it
-//     let db = VectorDatabase::load_from_disk()?;
-//     db.find_similar(source_id, num_results)
-// }
+pub fn find_similar(source_id: u32, num_results: usize) -> Result<Vec<u32>, String> {
+    // Otherwise, load the existing db from disk and query it
+    let db = VectorDatabase::load_from_disk()?;
+    db.find_similar(source_id, num_results)
+}
