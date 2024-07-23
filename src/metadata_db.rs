@@ -152,4 +152,26 @@ impl MetadataDatabase {
         }
         Ok(files)
     }
+
+    pub fn get_audio_files_for_ids(&self, ids: &[u32]) -> Result<Vec<AudioFile>, String> {
+        let id_list: String = ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        let query = format!(
+            "SELECT id, file_path FROM samples WHERE id IN ({})",
+            id_list
+        );
+
+        let mut stmt = self.connection.prepare(&query).map_err(|e| e.to_string())?;
+        let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
+        let mut files = Vec::new();
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            let id: i64 = row.get(0).unwrap();
+            let path: String = row.get(1).unwrap();
+            files.push(AudioFile { id, path });
+        }
+        Ok(files)
+    }
 }

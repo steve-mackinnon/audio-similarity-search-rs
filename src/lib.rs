@@ -27,10 +27,12 @@ pub fn build_db(asset_dir: &str) -> Result<VectorDatabase, String> {
     Ok(db)
 }
 
-pub fn find_similar(source_id: u32, num_results: usize) -> Result<Vec<u32>, String> {
+pub fn find_similar(source_id: u32, num_results: usize) -> Result<Vec<AudioFile>, String> {
     // Otherwise, load the existing db from disk and query it
-    let db = VectorDatabase::load_from_disk()?;
-    db.find_similar(source_id, num_results)
+    let vec_db = VectorDatabase::load_from_disk()?;
+    let ids = vec_db.find_similar(source_id, num_results)?;
+    let md_db = MetadataDatabase::load_from_disk()?;
+    md_db.get_audio_files_for_ids(&ids)
 }
 
 pub fn list_audio_files(start_offset: u32, num_results: u32) -> Result<Vec<AudioFile>, String> {
