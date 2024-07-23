@@ -48,7 +48,7 @@ impl MetadataDatabase {
                 "CREATE TABLE IF NOT EXISTS samples (
                     id INTEGER PRIMARY KEY,
                     analysis_root_dir_id INTEGER,
-                    file_path TEXT NOT NULL,
+                    file_path TEXT NOT NULL UNIQUE,
                     FOREIGN KEY(analysis_root_dir_id) REFERENCES analysis_root_dirs(id)
                 )",
                 (),
@@ -99,14 +99,36 @@ impl MetadataDatabase {
         file_path: &str,
         analysis_root_dir_id: i64,
     ) -> Result<i64, String> {
-        self.connection
+        if self
+            .connection
             .execute(
                 "INSERT INTO samples (file_path, analysis_root_dir_id) VALUES (?1, ?2)",
                 [&file_path, &analysis_root_dir_id.to_string().as_str()],
             )
-            .map_err(|e| format!("Error inserting into sqlite db: {}", e))?;
+            .is_ok()
+        {
+            Ok(self.connection.last_insert_rowid())
+        } else {
+            // The execution failure is most likely due to inserting a file_path that already
+            // exists. Attempt to get the id for file_path
+            let mut query = self
+                .connection
+                .prepare("SELECT id FROM samples WHERE file_path = ?1")
+                .map_err(|e| format!("Failed to prepare sqlite query: {}", e))?;
 
-        Ok(self.connection.last_insert_rowid())
+            let mut rows = query
+                .query(rusqlite::params![file_path])
+                .map_err(|e| e.to_string())?;
+            if let Some(row) = rows.next().map_err(|e| e.to_string())? {
+                let id: i64 = row.get(0).unwrap();
+                Ok(id)
+            } else {
+                Err(format!(
+                    "Failed to insert or lookup id for sample {}",
+                    file_path
+                ))
+            }
+        }
     }
 
     pub fn list_audio_files(
