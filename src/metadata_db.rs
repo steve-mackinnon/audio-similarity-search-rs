@@ -116,15 +116,12 @@ impl MetadataDatabase {
     ) -> Result<Vec<AudioFile>, String> {
         let mut query = self
             .connection
-            .prepare(
-                format!(
-                    "SELECT id, file_path FROM samples WHERE id > {} ORDER BY file_path LIMIT {}",
-                    start_offset, limit
-                )
-                .as_str(),
-            )
+            .prepare("SELECT id, file_path FROM samples WHERE id > ?1 ORDER BY file_path LIMIT ?2")
             .map_err(|e| format!("Failed to prepare sqlite query: {}", e))?;
-        let mut rows = query.query([]).map_err(|e| e.to_string())?;
+
+        let mut rows = query
+            .query(rusqlite::params![start_offset, limit])
+            .map_err(|e| e.to_string())?;
         let mut files: Vec<AudioFile> = Vec::new();
         while let Some(row) = rows.next().map_err(|e| e.to_string())? {
             let id: i64 = row.get(0).unwrap();
