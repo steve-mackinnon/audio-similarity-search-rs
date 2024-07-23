@@ -118,7 +118,7 @@ impl MetadataDatabase {
             .connection
             .prepare(
                 format!(
-                    "SELECT id, file_path FROM samples WHERE id > {} ORDER BY id LIMIT {}",
+                    "SELECT id, file_path FROM samples WHERE id > {} ORDER BY file_path LIMIT {}",
                     start_offset, limit
                 )
                 .as_str(),
