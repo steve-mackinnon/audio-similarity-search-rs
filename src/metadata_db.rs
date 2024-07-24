@@ -6,7 +6,7 @@ pub struct MetadataDatabase {
     connection: Connection,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct AudioFile {
     id: i64,
     path: String,
@@ -172,6 +172,13 @@ impl MetadataDatabase {
             let path: String = row.get(1).unwrap();
             files.push(AudioFile { id, path });
         }
-        Ok(files)
+        // The result of the sql query isn't guaranteed to match the order of ids, which are
+        // ranked by most to least similar. So, manually get the AudioFiles into order before
+        // returning.
+        let ordered_files: Vec<AudioFile> = ids
+            .iter()
+            .filter_map(|id| Some(files.iter().find(|f| f.id() == *id as i64)?.clone()))
+            .collect();
+        Ok(ordered_files)
     }
 }
