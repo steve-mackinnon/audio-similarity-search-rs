@@ -55,7 +55,11 @@ impl Feature {
 
 pub const NUM_DIMENSIONS: usize = 13;
 
-pub fn extract_features(run_mode: RunMode, asset_dir: &str) -> Result<Vec<Feature>, String> {
+pub fn extract_features(
+    run_mode: RunMode,
+    asset_dir: &str,
+    progress_callback: impl Fn(f32),
+) -> Result<Vec<Feature>, String> {
     let files = get_audio_files(asset_dir);
     let num_files = files.len();
     if num_files == 0 {
@@ -90,12 +94,15 @@ pub fn extract_features(run_mode: RunMode, asset_dir: &str) -> Result<Vec<Featur
                     }
                 });
             }
-            // Wait for threads to finish
-            thread_pool.join();
 
-            // Drain the results from the receiver
-            while let Ok(feature) = receiver.try_recv() {
-                features.push(feature);
+            let mut progress = 0.0;
+            let progress_increment = 1.0 / files.len() as f32;
+            while thread_pool.active_count() > 0 || thread_pool.queued_count() > 0 {
+                if let Ok(feature) = receiver.try_recv() {
+                    features.push(feature);
+                    progress += progress_increment;
+                    progress_callback(progress);
+                }
             }
         }
     }

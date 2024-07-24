@@ -11,11 +11,17 @@ mod file_utils;
 pub mod metadata_db;
 pub mod vector_db;
 
-pub fn build_db(asset_dir: &str) -> Result<VectorDatabase, String> {
+pub fn build_db(
+    asset_dir: &str,
+    progress_callback: impl Fn(f32),
+) -> Result<VectorDatabase, String> {
     let start_time = Instant::now();
-    let features =
-        feature_extractor::extract_features(feature_extractor::RunMode::Parallel, asset_dir)
-            .unwrap();
+    let features = feature_extractor::extract_features(
+        feature_extractor::RunMode::Parallel,
+        asset_dir,
+        progress_callback,
+    )
+    .unwrap();
     let elapsed = start_time.elapsed();
     println!("Took {:.1?} to extract features", elapsed);
 

@@ -29,7 +29,7 @@ fn main() {
                 panic!("Invalid args");
             }
             let audio_asset_dir = &args[2];
-            let _ = build_db(audio_asset_dir).unwrap();
+            let _ = build_db(audio_asset_dir, |_| {}).unwrap();
         }
         Mode::ListSamples => {
             if args.len() != 2 {
