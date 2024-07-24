@@ -17,11 +17,11 @@ pub fn data_directory() -> Result<PathBuf, String> {
     Ok(data_local_dir.to_path_buf())
 }
 
-pub fn feature_file_path() -> Result<PathBuf, String> {
-    Ok(data_directory()?.join("features"))
+pub fn metadata_db_path() -> Result<PathBuf, String> {
+    Ok(data_directory()?.join("md.db"))
 }
 
-pub fn db_path() -> Result<PathBuf, String> {
+pub fn vector_db_path() -> Result<PathBuf, String> {
     Ok(data_directory()?.join("data.mdb"))
 }
 

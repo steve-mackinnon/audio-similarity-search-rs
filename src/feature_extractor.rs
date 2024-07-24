@@ -1,16 +1,12 @@
 use rodio::{source::Source, Decoder};
 use rubato::Resampler;
 use rubato::{SincFixedIn, SincInterpolationParameters, SincInterpolationType};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fs::{self, File};
-use std::io::{BufReader, Read, Write};
+use std::fs::File;
+use std::io::BufReader;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use threadpool::ThreadPool;
 use walkdir::WalkDir;
-
-use crate::file_utils;
 
 fn get_audio_files(root_dir: &str) -> Vec<String> {
     let path = PathBuf::from(root_dir);
@@ -38,15 +34,13 @@ pub enum RunMode {
 pub struct Feature {
     feature_vector: Vec<f32>,
     source_file: String,
-    id: u32,
 }
 
 impl Feature {
-    pub fn new(feature_vector: Vec<f32>, source_file: String, id: u32) -> Self {
+    pub fn new(feature_vector: Vec<f32>, source_file: String) -> Self {
         Self {
             feature_vector,
             source_file,
-            id,
         }
     }
 
@@ -56,29 +50,6 @@ impl Feature {
 
     pub fn source_file(&self) -> &str {
         &self.source_file
-    }
-
-    pub fn id(&self) -> u32 {
-        self.id
-    }
-}
-
-#[derive(Clone, Deserialize, Serialize)]
-pub struct FeatureMetadata {
-    source_dir: String,
-    feature_map: HashMap<u32, String>,
-}
-
-impl FeatureMetadata {
-    pub fn new(source_dir: String, feature_map: HashMap<u32, String>) -> Self {
-        Self {
-            source_dir,
-            feature_map,
-        }
-    }
-
-    pub fn feature_map(&self) -> &HashMap<u32, String> {
-        &self.feature_map
     }
 }
 
@@ -95,9 +66,9 @@ pub fn extract_features(run_mode: RunMode, asset_dir: &str) -> Result<Vec<Featur
 
     match run_mode {
         RunMode::SingleThreaded => {
-            for (i, file) in files.iter().enumerate() {
+            for file in files.iter() {
                 if let Ok(mfcc) = decode_and_calculate_mfcc(file, 22050) {
-                    features.push(Feature::new(mfcc, file.to_string(), i as u32));
+                    features.push(Feature::new(mfcc, file.to_string()));
                 }
             }
         }
@@ -108,12 +79,12 @@ pub fn extract_features(run_mode: RunMode, asset_dir: &str) -> Result<Vec<Featur
 
             let (sender, receiver) = mpsc::channel::<Feature>();
 
-            for (i, file) in files.iter().enumerate() {
+            for file in files.iter() {
                 let f = file.to_string();
                 let sender = sender.clone();
                 thread_pool.execute(move || {
                     if let Ok(mfcc) = decode_and_calculate_mfcc(&f, 22050) {
-                        sender.send(Feature::new(mfcc, f, i as u32)).unwrap();
+                        sender.send(Feature::new(mfcc, f)).unwrap();
                     } else {
                         println!("Failed to extract features for {f}");
                     }
@@ -128,53 +99,6 @@ pub fn extract_features(run_mode: RunMode, asset_dir: &str) -> Result<Vec<Featur
             }
         }
     }
-    Ok(features)
-}
-
-pub fn save_to_file(features: &[Feature], source_dir: String) -> Result<(), String> {
-    let file_path = file_utils::feature_file_path()?;
-
-    let mut feature_map: HashMap<u32, String> = HashMap::new();
-    for feature in features.iter() {
-        feature_map.insert(feature.id(), feature.source_file().to_string());
-    }
-
-    let feature_metadata = FeatureMetadata::new(source_dir, feature_map);
-    let json = serde_json::to_string(&feature_metadata)
-        .map_err(|e| format!("Failed to convert features to string: {}", e))?;
-    if let Ok(true) = fs::try_exists(&file_path) {
-        println!("Removing existing feature file...");
-        fs::remove_file(&file_path).map_err(|e| format!("Failed to remove existing db: {}", e))?;
-    }
-    let mut out_file =
-        File::create(&file_path).map_err(|e| format!("Failed to create features file, {}", e))?;
-    out_file
-        .write(json.as_bytes())
-        .map_err(|e| format!("Failed to write to file {}", e))?;
-
-    Ok(())
-}
-
-pub fn from_file(asset_dir: Option<&str>) -> Result<FeatureMetadata, String> {
-    let file_path = file_utils::data_directory()?.join("features");
-
-    let mut file = File::open(file_path).map_err(|e| format!("Failed to open file {}", e))?;
-    let mut json = String::new();
-    file.read_to_string(&mut json)
-        .map_err(|e| format!("Failed to read {}", e))?;
-    let features: FeatureMetadata =
-        serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize: {}", e))?;
-
-    match asset_dir {
-        Some(dir) if dir != features.source_dir => {
-            return Err(format!(
-                "No features were saved to file for asset dir: {}",
-                dir
-            ));
-        }
-        _ => {}
-    }
-
     Ok(features)
 }
 

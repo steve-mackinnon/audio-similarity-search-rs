@@ -2,11 +2,11 @@ use std::num::NonZeroUsize;
 
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use std::collections::HashMap;
 use std::fs;
 
-use crate::feature_extractor::{self, Feature, FeatureMetadata};
+use crate::feature_extractor::Feature;
 use crate::file_utils;
+use crate::metadata_db::MetadataDatabase;
 use arroy::distances::Angular;
 use arroy::{Database as ArroyDatabase, Reader, Writer};
 
@@ -15,15 +15,10 @@ const TWENTY_HUNDRED_MIB: usize = 2 * 1024 * 1024 * 1024;
 
 pub struct VectorDatabase {
     db: ArroyDatabase<Angular>,
-    feature_metadata: FeatureMetadata,
 }
 
 impl VectorDatabase {
-    pub fn feature_metadata(&self) -> &FeatureMetadata {
-        &self.feature_metadata
-    }
-
-    pub fn load_from_disk(asset_dir: Option<&str>) -> Result<VectorDatabase, String> {
+    pub fn load_from_disk() -> Result<VectorDatabase, String> {
         let dir = file_utils::data_directory()?;
         let env = unsafe {
             heed::EnvOpenOptions::new()
@@ -36,23 +31,26 @@ impl VectorDatabase {
         let db: ArroyDatabase<Angular> = env
             .create_database(&mut write_txn, None)
             .map_err(|e| e.to_string())?;
-        let feature_metadata = feature_extractor::from_file(asset_dir)?;
 
-        Ok(VectorDatabase {
-            db,
-            feature_metadata,
-        })
+        Ok(VectorDatabase { db })
     }
 
-    pub fn from_features(
+    /// Builds the database and saves it on disk.
+    pub fn build(
         features: &[Feature],
+        analysis_root_dir: &str,
         dimensions: usize,
-        source_dir: &str,
     ) -> Result<VectorDatabase, String> {
+        // First, create our metadata db which is used to associate an id with a path
+        // to the audio file. Since arroy only allows insertion of an id and a vector,
+        // we keep the file path and any other necessary metadata in a separate sqlite db.
+        let metadata_db = MetadataDatabase::load_from_disk()?;
+        let root_dir_id = metadata_db.initialize(analysis_root_dir)?;
+
         // TODO: right now we remove an existing db if we find one. Can we append to an existing db
         // if we aren't fully rebuilding the index? If so, we should split this out into a separate
         // clean/full rebuild function.
-        let db_path = file_utils::db_path()?;
+        let db_path = file_utils::vector_db_path()?;
         if let Ok(true) = fs::try_exists(&db_path) {
             println!("Removing existing database...");
             fs::remove_file(db_path).map_err(|e| format!("Failed to remove existing db: {}", e))?;
@@ -84,8 +82,11 @@ impl VectorDatabase {
         let writer = Writer::<Angular>::new(db, index, dimensions);
         // Add features
         for feature in features.iter() {
+            // First, write to the sqlite db to store metadata an obtain an id
+            let id = metadata_db.insert_sample_metadata(feature.source_file(), root_dir_id)?;
+            // Write to the annoy vector db using the id from the sqlite table
             writer
-                .add_item(&mut write_txn, feature.id(), feature.feature_vector())
+                .add_item(&mut write_txn, id as u32, feature.feature_vector())
                 .map_err(|e| e.to_string())?;
         }
         let mut rng = StdRng::from_entropy();
@@ -98,19 +99,11 @@ impl VectorDatabase {
         // Commit the built index to the db
         write_txn.commit().map_err(|e| e.to_string())?;
 
-        let mut feature_map: HashMap<u32, String> = HashMap::new();
-        for feature in features.iter() {
-            feature_map.insert(feature.id(), feature.source_file().to_string());
-        }
-
-        Ok(VectorDatabase {
-            db,
-            feature_metadata: FeatureMetadata::new(source_dir.to_string(), feature_map),
-        })
+        Ok(VectorDatabase { db })
     }
 
-    /// Returns a vector of file paths to the top k similar results
-    pub fn find_similar(&self, id: u32, num_results: usize) -> Result<Vec<String>, String> {
+    /// Returns a vector of file ids to the top k similar results
+    pub fn find_similar(&self, id: u32, num_results: usize) -> Result<Vec<u32>, String> {
         let data_local_dir = file_utils::data_directory()?;
         let env = unsafe {
             heed::EnvOpenOptions::new()
@@ -133,8 +126,7 @@ impl VectorDatabase {
             .map_err(|e| e.to_string())?
             .unwrap()
             .iter()
-            .filter_map(|result| self.feature_metadata.feature_map().get(&result.0))
-            .map(|result| result.to_string())
+            .map(|result| result.0)
             .collect();
         Ok(search_results)
     }
