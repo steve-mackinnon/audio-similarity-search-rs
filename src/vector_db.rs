@@ -4,7 +4,7 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::fs;
 
-use crate::feature_extractor::Feature;
+use crate::feature::Feature;
 use crate::file_utils;
 use crate::metadata_db::MetadataDatabase;
 use arroy::distances::Angular;

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::file_utils;
+use crate::{feature::Feature, file_utils};
 use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
 
@@ -162,10 +162,10 @@ impl MetadataDatabase {
         Ok(files)
     }
 
-    pub fn get_all_features(&self) -> Result<HashMap<String, Vec<f32>>, String> {
+    pub fn get_all_features(&self) -> Result<HashMap<String, Feature>, String> {
         let query = self
             .connection
-            .prepare("SELECT file_path, feature_vector FROM samples");
+            .prepare("SELECT file_path, feature_vector, id FROM samples");
         // Return an empty hashmap if the query fails, since this will happen when
         // get_all_features() is called before a metadata db is populated.
         if query.is_err() {
@@ -173,12 +173,13 @@ impl MetadataDatabase {
         }
         let mut query = query.unwrap();
 
-        let feature_map: HashMap<String, Vec<f32>> = query
+        let feature_map: HashMap<String, Feature> = query
             .query_map([], |row| {
                 let path: String = row.get(0).unwrap();
-                let vec: Vec<u8> = row.get(1).unwrap();
-                let vec: Vec<f32> = bincode::deserialize(&vec).unwrap();
-                Ok((path, vec))
+                let feature_vec: Vec<u8> = row.get(1).unwrap();
+                let feature_vec: Vec<f32> = bincode::deserialize(&feature_vec).unwrap();
+                let id: i64 = row.get(2).unwrap();
+                Ok((path.clone(), Feature::new(feature_vec, path, Some(id))))
             })
             .map_err(|e| e.to_string())?
             .filter_map(|val| {

@@ -6,6 +6,7 @@ use std::time::Instant;
 use metadata_db::{AudioFile, MetadataDatabase};
 use vector_db::VectorDatabase;
 
+mod feature;
 pub mod feature_extractor;
 mod file_utils;
 pub mod metadata_db;
