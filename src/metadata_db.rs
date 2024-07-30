@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use crate::file_utils;
-use rusqlite::{Connection, Result};
+use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
 
 pub struct MetadataDatabase {
@@ -49,6 +51,7 @@ impl MetadataDatabase {
                     id INTEGER PRIMARY KEY,
                     analysis_root_dir_id INTEGER,
                     file_path TEXT NOT NULL UNIQUE,
+                    feature_vector BLOB NOT NULL,
                     FOREIGN KEY(analysis_root_dir_id) REFERENCES analysis_root_dirs(id)
                 )",
                 (),
@@ -98,12 +101,18 @@ impl MetadataDatabase {
         &self,
         file_path: &str,
         analysis_root_dir_id: i64,
+        feature_vec: &[f32],
     ) -> Result<i64, String> {
+        let serialized_vec = bincode::serialize(feature_vec).map_err(|e| e.to_string())?;
         if self
             .connection
             .execute(
-                "INSERT INTO samples (file_path, analysis_root_dir_id) VALUES (?1, ?2)",
-                [&file_path, &analysis_root_dir_id.to_string().as_str()],
+                     "INSERT INTO samples (file_path, analysis_root_dir_id, feature_vector) VALUES (?1, ?2, ?3)",
+                   params![
+                    &file_path,
+                    &analysis_root_dir_id.to_string().as_str(),
+                    &serialized_vec,
+                ],
             )
             .is_ok()
         {
@@ -151,6 +160,35 @@ impl MetadataDatabase {
             files.push(AudioFile { id, path });
         }
         Ok(files)
+    }
+
+    pub fn get_all_features(&self) -> Result<HashMap<String, Vec<f32>>, String> {
+        let query = self
+            .connection
+            .prepare("SELECT file_path, feature_vector FROM samples");
+        // Return an empty hashmap if the query fails, since this will happen when
+        // get_all_features() is called before a metadata db is populated.
+        if query.is_err() {
+            return Ok(HashMap::new());
+        }
+        let mut query = query.unwrap();
+
+        let feature_map: HashMap<String, Vec<f32>> = query
+            .query_map([], |row| {
+                let path: String = row.get(0).unwrap();
+                let vec: Vec<u8> = row.get(1).unwrap();
+                let vec: Vec<f32> = bincode::deserialize(&vec).unwrap();
+                Ok((path, vec))
+            })
+            .map_err(|e| e.to_string())?
+            .filter_map(|val| {
+                if val.is_ok() {
+                    return Some(val.unwrap());
+                }
+                None
+            })
+            .collect();
+        Ok(feature_map)
     }
 
     pub fn get_audio_files_for_ids(&self, ids: &[u32]) -> Result<Vec<AudioFile>, String> {

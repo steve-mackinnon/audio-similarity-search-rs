@@ -83,7 +83,11 @@ impl VectorDatabase {
         // Add features
         for feature in features.iter() {
             // First, write to the sqlite db to store metadata an obtain an id
-            let id = metadata_db.insert_sample_metadata(feature.source_file(), root_dir_id)?;
+            let id = metadata_db.insert_sample_metadata(
+                feature.source_file(),
+                root_dir_id,
+                feature.feature_vector(),
+            )?;
             // Write to the annoy vector db using the id from the sqlite table
             writer
                 .add_item(&mut write_txn, id as u32, feature.feature_vector())

@@ -16,9 +16,13 @@ pub fn build_db(
     progress_callback: impl Fn(f32),
 ) -> Result<VectorDatabase, String> {
     let start_time = Instant::now();
+
+    let metadata_db = MetadataDatabase::load_from_disk()?;
+    let cached_features = metadata_db.get_all_features()?;
     let features = feature_extractor::extract_features(
         feature_extractor::RunMode::Parallel,
         asset_dir,
+        &cached_features,
         progress_callback,
     )
     .unwrap();

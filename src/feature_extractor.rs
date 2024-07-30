@@ -1,6 +1,7 @@
 use rodio::{source::Source, Decoder};
 use rubato::Resampler;
 use rubato::{SincFixedIn, SincInterpolationParameters, SincInterpolationType};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -58,6 +59,7 @@ pub const NUM_DIMENSIONS: usize = 13;
 pub fn extract_features(
     run_mode: RunMode,
     asset_dir: &str,
+    cached_features: &HashMap<String, Vec<f32>>,
     progress_callback: impl Fn(f32),
 ) -> Result<Vec<Feature>, String> {
     let files = get_audio_files(asset_dir);
@@ -86,13 +88,17 @@ pub fn extract_features(
             for file in files.iter() {
                 let f = file.to_string();
                 let sender = sender.clone();
-                thread_pool.execute(move || {
-                    if let Ok(mfcc) = decode_and_calculate_mfcc(&f, 22050) {
-                        sender.send(Feature::new(mfcc, f)).unwrap();
-                    } else {
-                        println!("Failed to extract features for {f}");
-                    }
-                });
+                if let Some(cached_feature_vec) = cached_features.get(&f) {
+                    features.push(Feature::new(cached_feature_vec.clone(), f));
+                } else {
+                    thread_pool.execute(move || {
+                        if let Ok(mfcc) = decode_and_calculate_mfcc(&f, 22050) {
+                            sender.send(Feature::new(mfcc, f)).unwrap();
+                        } else {
+                            println!("Failed to extract features for {f}");
+                        }
+                    });
+                }
             }
 
             let mut progress = 0.0;

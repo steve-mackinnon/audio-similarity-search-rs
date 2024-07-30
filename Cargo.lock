@@ -114,6 +114,7 @@ version = "0.1.0"
 dependencies = [
  "arroy",
  "aubio-rs",
+ "bincode",
  "directories",
  "heed",
  "num_cpus",
