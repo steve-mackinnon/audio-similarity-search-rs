@@ -59,9 +59,12 @@ impl VectorDatabase {
         let metadata_db = MetadataDatabase::load_from_disk()?;
         let root_dir_id = metadata_db.initialize(analysis_root_dir)?;
 
-        // TODO: right now we remove an existing db if we find one. Can we append to an existing db
-        // if we aren't fully rebuilding the index? If so, we should split this out into a separate
-        // clean/full rebuild function.
+        // Remove the existing vector db if one exists. Arroy does not currently support updating the
+        // index after creation, so we need to rebuild it from scratch to add new items.
+        //
+        // To make this faster, we also persist feature vectors in the sqlite metadata db and use those
+        // to build new vector db indices. Feature extraction is much more costly than building the vector
+        // db index, so this is a major speedup.
         let db_path = file_utils::vector_db_path()?;
         if let Ok(true) = fs::try_exists(&db_path) {
             println!("Removing existing database...");
