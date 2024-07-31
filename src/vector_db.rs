@@ -5,6 +5,7 @@ use rand::SeedableRng;
 use std::fs;
 
 use crate::feature::Feature;
+use crate::feature_extractor::NUM_DIMENSIONS;
 use crate::file_utils;
 use crate::metadata_db::MetadataDatabase;
 use arroy::distances::Angular;
@@ -27,12 +28,23 @@ impl VectorDatabase {
         }
         .map_err(|_| format!("Failed to open database from {}", dir.to_string_lossy()))?;
 
-        let mut write_txn = env.write_txn().map_err(|e| e.to_string())?;
-        let db: ArroyDatabase<Angular> = env
-            .create_database(&mut write_txn, None)
+        let read_txn = env.read_txn().map_err(|e| e.to_string())?;
+        let db: Option<ArroyDatabase<Angular>> = env
+            .open_database(&read_txn, None)
             .map_err(|e| e.to_string())?;
-
-        Ok(VectorDatabase { db })
+        if let Some(db) = db {
+            let writer = Writer::<Angular>::new(db, 0, NUM_DIMENSIONS);
+            let mut write_txn = env.write_txn().map_err(|e| e.to_string())?;
+            let mut rng = StdRng::from_entropy();
+            // Note: we still need to call build() after loading the db from disk. Even if
+            // the index was previous built.
+            writer
+                .build(&mut write_txn, &mut rng, None)
+                .map_err(|e| e.to_string())?;
+            write_txn.commit().map_err(|e| e.to_string())?;
+            return Ok(VectorDatabase { db });
+        }
+        Err("Failed to read db".to_string())
     }
 
     /// Builds the database and saves it on disk.
@@ -128,7 +140,7 @@ impl VectorDatabase {
         let search_results = reader
             .nns_by_item(&rtxn, id, num_results, search_k, None)
             .map_err(|e| e.to_string())?
-            .unwrap()
+            .ok_or("Unexpected similarity search error".to_string())?
             .iter()
             .map(|result| result.0)
             .collect();
