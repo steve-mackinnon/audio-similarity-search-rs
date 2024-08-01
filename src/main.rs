@@ -1,4 +1,4 @@
-use audio_similarity_search::{build_db, metadata_db, vector_db::VectorDatabase};
+use audio_similarity_search::{analyze_and_build_db, metadata_db, vector_db::VectorDatabase};
 use core::panic;
 use metadata_db::MetadataDatabase;
 use std::env;
@@ -29,7 +29,7 @@ fn main() {
                 panic!("Invalid args");
             }
             let audio_asset_dir = &args[2];
-            let _ = build_db(audio_asset_dir, |_| {}).unwrap();
+            let _ = analyze_and_build_db(audio_asset_dir, |_| {}).unwrap();
         }
         Mode::ListSamples => {
             if args.len() != 2 {

@@ -20,11 +20,3 @@ pub fn data_directory() -> Result<PathBuf, String> {
 pub fn metadata_db_path() -> Result<PathBuf, String> {
     Ok(data_directory()?.join("md.db"))
 }
-
-pub fn vector_db_path() -> Result<PathBuf, String> {
-    Ok(data_directory()?.join("data.mdb"))
-}
-
-pub fn db_lock_path() -> Result<PathBuf, String> {
-    Ok(data_directory()?.join("lock.mdb"))
-}

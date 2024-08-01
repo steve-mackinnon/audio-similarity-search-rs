@@ -13,7 +13,7 @@ mod file_utils;
 pub mod metadata_db;
 pub mod vector_db;
 
-pub fn build_db(
+pub fn analyze_and_build_db(
     asset_dir: &str,
     progress_callback: impl Fn(f32),
 ) -> Result<VectorDatabase, String> {
@@ -32,7 +32,7 @@ pub fn build_db(
     println!("Took {:.1?} to extract features", elapsed);
 
     let start_time = Instant::now();
-    // First, add the newly extracted features to the metadata db
+    // Add the newly extracted features to the metadata db
     let dir_id = metadata_db.initialize(asset_dir)?;
     for feature in features.iter_mut() {
         let id = metadata_db.insert_sample_metadata(
@@ -44,11 +44,8 @@ pub fn build_db(
     }
 
     // Combine previously cached features with the new ones
-    let features: Vec<Feature> = features
-        .into_iter()
-        .chain(cached_features.into_values())
-        .collect();
-    let db = VectorDatabase::build(&features, feature_extractor::NUM_DIMENSIONS)?;
+    let db = VectorDatabase::load_from_disk()?;
+    db.add_features_to_index(&features, feature_extractor::NUM_DIMENSIONS)?;
     let elapsed = start_time.elapsed();
     println!("Took {:.1?} to build database", elapsed);
 
