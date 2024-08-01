@@ -3,6 +3,7 @@
 
 use std::time::Instant;
 
+use feature::Feature;
 use metadata_db::{AudioFile, MetadataDatabase};
 use vector_db::VectorDatabase;
 
@@ -20,18 +21,34 @@ pub fn build_db(
 
     let metadata_db = MetadataDatabase::load_from_disk()?;
     let cached_features = metadata_db.get_all_features()?;
-    let features = feature_extractor::extract_features(
+    let mut features: Vec<Feature> = feature_extractor::extract_features(
         feature_extractor::RunMode::Parallel,
         asset_dir,
         &cached_features,
         progress_callback,
-    )
-    .unwrap();
+    )?;
+
     let elapsed = start_time.elapsed();
     println!("Took {:.1?} to extract features", elapsed);
 
     let start_time = Instant::now();
-    let db = VectorDatabase::build(&features, asset_dir, feature_extractor::NUM_DIMENSIONS)?;
+    // First, add the newly extracted features to the metadata db
+    let dir_id = metadata_db.initialize(asset_dir)?;
+    for feature in features.iter_mut() {
+        let id = metadata_db.insert_sample_metadata(
+            feature.source_file(),
+            dir_id,
+            feature.feature_vector(),
+        )?;
+        feature.set_id(id);
+    }
+
+    // Combine previously cached features with the new ones
+    let features: Vec<Feature> = features
+        .into_iter()
+        .chain(cached_features.into_values())
+        .collect();
+    let db = VectorDatabase::build(&features, feature_extractor::NUM_DIMENSIONS)?;
     let elapsed = start_time.elapsed();
     println!("Took {:.1?} to build database", elapsed);
 

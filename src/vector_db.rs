@@ -7,7 +7,6 @@ use std::fs;
 use crate::feature::Feature;
 use crate::feature_extractor::NUM_DIMENSIONS;
 use crate::file_utils;
-use crate::metadata_db::MetadataDatabase;
 use arroy::distances::Angular;
 use arroy::{Database as ArroyDatabase, Reader, Writer};
 
@@ -28,37 +27,23 @@ impl VectorDatabase {
         }
         .map_err(|_| format!("Failed to open database from {}", dir.to_string_lossy()))?;
 
-        let read_txn = env.read_txn().map_err(|e| e.to_string())?;
-        let db: Option<ArroyDatabase<Angular>> = env
-            .open_database(&read_txn, None)
+        let mut write_txn = env.write_txn().map_err(|e| e.to_string())?;
+        let db: ArroyDatabase<Angular> = env
+            .create_database(&mut write_txn, None)
             .map_err(|e| e.to_string())?;
-        if let Some(db) = db {
-            let writer = Writer::<Angular>::new(db, 0, NUM_DIMENSIONS);
-            let mut write_txn = env.write_txn().map_err(|e| e.to_string())?;
-            let mut rng = StdRng::from_entropy();
-            // Note: we still need to call build() after loading the db from disk. Even if
-            // the index was previous built.
-            writer
-                .build(&mut write_txn, &mut rng, None)
-                .map_err(|e| e.to_string())?;
-            write_txn.commit().map_err(|e| e.to_string())?;
-            return Ok(VectorDatabase { db });
-        }
-        Err("Failed to read db".to_string())
+        let writer = Writer::<Angular>::new(db, 0, NUM_DIMENSIONS);
+        let mut rng = StdRng::from_entropy();
+        // Note: we still need to call build() after loading the db from disk. Even if
+        // the index was previous built.
+        writer
+            .build(&mut write_txn, &mut rng, None)
+            .map_err(|e| e.to_string())?;
+        write_txn.commit().map_err(|e| e.to_string())?;
+        Ok(VectorDatabase { db })
     }
 
     /// Builds the database and saves it on disk.
-    pub fn build(
-        features: &[Feature],
-        analysis_root_dir: &str,
-        dimensions: usize,
-    ) -> Result<VectorDatabase, String> {
-        // First, create our metadata db which is used to associate an id with a path
-        // to the audio file. Since arroy only allows insertion of an id and a vector,
-        // we keep the file path and any other necessary metadata in a separate sqlite db.
-        let metadata_db = MetadataDatabase::load_from_disk()?;
-        let root_dir_id = metadata_db.initialize(analysis_root_dir)?;
-
+    pub fn build(features: &[Feature], dimensions: usize) -> Result<VectorDatabase, String> {
         // Remove the existing vector db if one exists. Arroy does not currently support updating the
         // index after creation, so we need to rebuild it from scratch to add new items.
         //
@@ -97,13 +82,8 @@ impl VectorDatabase {
         let writer = Writer::<Angular>::new(db, index, dimensions);
         // Add features
         for feature in features.iter() {
-            // First, write to the sqlite db to store metadata an obtain an id
-            let id = metadata_db.insert_sample_metadata(
-                feature.source_file(),
-                root_dir_id,
-                feature.feature_vector(),
-            )?;
-            // Write to the annoy vector db using the id from the sqlite table
+            let id = feature.id().unwrap();
+            // Write to the arroy vector db using the id from the sqlite table
             writer
                 .add_item(&mut write_txn, id as u32, feature.feature_vector())
                 .map_err(|e| e.to_string())?;

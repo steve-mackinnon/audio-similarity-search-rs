@@ -25,4 +25,8 @@ impl Feature {
     pub fn id(&self) -> &Option<i64> {
         &self.id
     }
+
+    pub fn set_id(&mut self, id: i64) {
+        self.id = Some(id);
+    }
 }

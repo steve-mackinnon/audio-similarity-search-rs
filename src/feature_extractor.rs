@@ -68,17 +68,16 @@ pub fn extract_features(
             for file in files.iter() {
                 let f = file.to_string();
                 let sender = sender.clone();
-                if let Some(cached_feature) = cached_features.get(&f) {
-                    features.push(cached_feature.clone());
-                } else {
-                    thread_pool.execute(move || {
-                        if let Ok(mfcc) = decode_and_calculate_mfcc(&f, 22050) {
-                            sender.send(Feature::new(mfcc, f, None)).unwrap();
-                        } else {
-                            println!("Failed to extract features for {f}");
-                        }
-                    });
+                if cached_features.get(&f).is_some() {
+                    continue;
                 }
+                thread_pool.execute(move || {
+                    if let Ok(mfcc) = decode_and_calculate_mfcc(&f, 22050) {
+                        sender.send(Feature::new(mfcc, f, None)).unwrap();
+                    } else {
+                        println!("Failed to extract features for {f}");
+                    }
+                });
             }
 
             let mut progress = 0.0;
