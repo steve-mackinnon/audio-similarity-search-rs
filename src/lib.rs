@@ -62,5 +62,5 @@ pub fn find_similar(source_id: u32, num_results: usize) -> Result<Vec<AudioFile>
 
 pub fn list_audio_files(start_offset: u32, num_results: u32) -> Result<Vec<AudioFile>, String> {
     let db = MetadataDatabase::load_from_disk()?;
-    db.list_audio_files(start_offset, num_results)
+    db.list_audio_files(start_offset, Some(num_results))
 }

@@ -143,13 +143,14 @@ impl MetadataDatabase {
     pub fn list_audio_files(
         &self,
         start_offset: u32,
-        limit: u32,
+        limit: Option<u32>,
     ) -> Result<Vec<AudioFile>, String> {
         let mut query = self
             .connection
             .prepare("SELECT id, file_path FROM samples WHERE id > ?1 ORDER BY file_path LIMIT ?2")
             .map_err(|e| format!("Failed to prepare sqlite query: {}", e))?;
 
+        let limit = limit.unwrap_or(u32::MAX);
         let mut rows = query
             .query(rusqlite::params![start_offset, limit])
             .map_err(|e| e.to_string())?;

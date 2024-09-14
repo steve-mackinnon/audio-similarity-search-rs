@@ -1,61 +1,65 @@
 use audio_similarity_search::{analyze_and_build_db, metadata_db, vector_db::VectorDatabase};
-use core::panic;
+use clap::{Parser, Subcommand};
 use metadata_db::MetadataDatabase;
-use std::env;
 
-enum Mode {
-    Build,
-    Search,
-    ListSamples,
+#[derive(Parser, Debug)]
+#[command(
+    name = "audio-similarity-search",
+    about = "A CLI for running similarity search across audio files. First, run analyze to analyze a directory of audio files. Then list-samples, can be used to list the analyzed samples and their IDs. search can be used to find similar samples given a sample ID."
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Debug, Subcommand)]
+enum Commands {
+    /// Run analysis on the provided directory. Builds a vector database that can be queried to find similar samples using the search command.
+    Analyze {
+        #[arg(value_name = "SOURCE_DIR")]
+        source_dir: String,
+    },
+    /// Run similarity search for a given sample
+    Search {
+        /// The source sample ID
+        #[arg(value_name = "SAMPLE_ID")]
+        id: u32,
+        /// How many results to return
+        #[arg(value_name = "NUM_RESULTS")]
+        num_results: usize,
+    },
+    /// Lists all analyzed sample paths and their IDs
+    List {
+        /// OPTIONAL: The maximum number of samples to return
+        #[arg(value_name = "LIMIT")]
+        limit: Option<u32>,
+    },
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let cli = Cli::parse();
 
-    if args.len() < 2 {
-        panic!("Invalid number of args provided");
-    }
-    let mode = &args[1];
-    let run_mode = match mode as &str {
-        "build" => Mode::Build,
-        "search" => Mode::Search,
-        "list-samples" => Mode::ListSamples,
-        value => panic!("Invalid mode provided as first argument: {}", value),
-    };
-
-    match run_mode {
-        Mode::Build => {
-            if args.len() != 3 {
-                panic!("Invalid args");
-            }
-            let audio_asset_dir = &args[2];
-            let _ = analyze_and_build_db(audio_asset_dir, |_| {}).unwrap();
+    match &cli.command {
+        Commands::Analyze { source_dir } => {
+            let _ = analyze_and_build_db(&source_dir, |_| {}).unwrap();
         }
-        Mode::ListSamples => {
-            if args.len() != 2 {
-                panic!("Invalid args");
-            }
-            list_samples();
-        }
-        Mode::Search => {
-            if args.len() != 4 {
-                panic!("Invalid args provided for search mode. Please pass the source sample ID and num results");
-            }
-            let source_id = args[2].parse::<u32>().unwrap();
-            let num_results = args[3].parse::<usize>().unwrap();
+        Commands::Search { id, num_results } => {
             let db = VectorDatabase::load_from_disk().unwrap();
-            if let Ok(results) = db.find_similar(source_id, num_results) {
+            if let Ok(results) = db.find_similar(*id, *num_results) {
                 for result in results.iter() {
                     println!("{result}");
                 }
             }
         }
-    };
+        Commands::List { limit } => {
+            list_samples(*limit);
+        }
+    }
 }
 
-fn list_samples() {
+fn list_samples(limit: Option<u32>) {
     let db = MetadataDatabase::load_from_disk().unwrap();
-    let files = db.list_audio_files(0, 1000).unwrap();
+    let files = db.list_audio_files(0, limit).unwrap();
     for file in files.iter() {
         println!("{}", file.path());
     }
