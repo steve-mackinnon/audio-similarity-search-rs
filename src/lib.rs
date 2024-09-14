@@ -20,6 +20,7 @@ pub fn analyze_and_build_db(
     let start_time = Instant::now();
 
     let metadata_db = MetadataDatabase::load_from_disk()?;
+    // We cache feature vectors in the SQLite db to avoid re-analyzing samples
     let cached_features = metadata_db.get_all_features()?;
     let mut features: Vec<Feature> = feature_extractor::extract_features(
         feature_extractor::RunMode::Parallel,
